@@ -1,6 +1,5 @@
 // src/firebase.js
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { getFirestore, collection, addDoc, query, where, getDocs } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -12,35 +11,42 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
-export const db = getFirestore(app);
+const db = getFirestore(app);
 
-// Helper to sign-in (graceful popup handler)
-export const signInWithGoogle = async () => {
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    return result.user;
-  } catch (error) {
-    if (error.code === 'auth/popup-closed-by-user') {
-      console.warn('User dismissed the sign-in popup.');
-      return null;
-    }
-    if (error.code === 'auth/unauthorized-domain') {
-      console.error('Domain not whitelisted in Firebase Console.');
-    }
-    throw error;
-  }
+// Firestore collections
+const tripsCol = collection(db, "trips");
+
+// Save a new trip
+/**
+ * Saves a trip to Firestore
+ * @param {string} userId - The user's ID from Supabase
+ * @param {string} destination - Trip destination
+ * @param {number} days - Number of days for the trip
+ * @param {string} plan - The trip plan details
+ * @returns {Promise} A promise that resolves with the document reference
+ */
+export const saveTrip = async (userId, destination, days, plan) => {
+  return addDoc(tripsCol, { 
+    userId, 
+    destination, 
+    days, 
+    plan, 
+    createdAt: new Date().toISOString() 
+  });
 };
 
-// Firestore helpers
-const tripsCol = collection(db, "trips");
-export const saveTrip = async (uid, destination, days, plan) =>
-  addDoc(tripsCol, { uid, destination, days, plan, createdAt: Date.now() });
-
-export const loadTrips = async (uid) => {
-  const q = query(tripsCol, where("uid", "==", uid));
+/**
+ * Loads trips for a specific user
+ * @param {string} userId - The user's ID from Supabase
+ * @returns {Promise<Array>} A promise that resolves with an array of trip objects
+ */
+export const loadTrips = async (userId) => {
+  const q = query(tripsCol, where("userId", "==", userId));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(doc => ({ 
+    id: doc.id, 
+    ...doc.data() 
+  }));
 };

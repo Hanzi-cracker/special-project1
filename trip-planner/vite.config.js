@@ -10,7 +10,13 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
-      'process.env': { ...process.env, ...env }
+      // Explicitly define only the environment variables that should be exposed to the client
+      'process.env': {
+        VITE_APP_TITLE: JSON.stringify(env.VITE_APP_TITLE || ''),
+        VITE_API_BASE_URL: JSON.stringify(env.VITE_API_BASE_URL || ''),
+        // Add other environment variables that need to be exposed to the client
+        // Always prefix them with VITE_ to ensure they're properly exposed
+      }
     },
     server: {
       port: 3000,

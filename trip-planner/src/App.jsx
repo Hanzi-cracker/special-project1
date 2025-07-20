@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth, signInWithGoogle, saveTrip, loadTrips } from "./firebase";
+import { saveTrip, loadTrips } from "./firebase";
+import { signInWithGoogle, signOut, onAuthStateChange } from "./supabase";
 import { Calendar, MapPin, Users, Clock, Star, ArrowRight, Globe, Sparkles, Camera, Heart, Plane, Mountain, Building, Waves, LogIn, LogOut, User } from "lucide-react";
 import FullPageZoomSlider from './components/ZoomSlider';
 import BottomNav from './components/BottomNav';
@@ -56,16 +56,62 @@ function App() {
   ];
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const { data: authListener } = onAuthStateChange((user) => {
       setUser(user);
       if (user) {
-        loadTrips(user.uid).then(setMyTrips);
+        loadUserTrips(user.id);
       } else {
         setMyTrips([]);
       }
     });
-    return unsubscribe;
+
+    return () => {
+      if (authListener?.unsubscribe) {
+        authListener.unsubscribe();
+      }
+    };
   }, []);
+
+  const handleSignIn = async () => {
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      console.error("Error signing in:", error);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      setUser(null);
+      setMyTrips([]);
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
+
+  const loadUserTrips = async (userId) => {
+    try {
+      const trips = await loadTrips(userId);
+      setMyTrips(trips);
+    } catch (error) {
+      console.error('Error loading trips:', error);
+    }
+  };
+
+  const handleSaveTrip = async () => {
+    if (!user || !plan) return;
+    
+    try {
+      await saveTrip(user.id, destination, days, plan);
+      const trips = await loadTrips(user.id);
+      setMyTrips(trips);
+      alert('Trip saved successfully!');
+    } catch (error) {
+      console.error('Error saving trip:', error);
+      alert('Failed to save trip. Please try again.');
+    }
+  };
 
   const handlePlanTrip = async () => {
     if (!destination.trim()) return;
@@ -141,30 +187,28 @@ function App() {
                 ))}
               </div>
               {user ? (
-                <>
-                  <div className="flex items-center space-x-3">
-                    <img 
-                      src={user.photoURL} 
-                      alt={user.displayName}
-                      className="w-8 h-8 rounded-full border-2 border-blue-400"
-                    />
-                    <span className="text-white font-medium font-sans hidden md:inline">{user.displayName}</span>
-                  </div>
-                  <button
-                    onClick={() => auth.signOut()}
-                    className="flex items-center space-x-2 bg-red-600/90 hover:bg-red-700 px-4 py-2 rounded-lg text-white font-medium transition-all duration-300 hover:scale-105 font-sans"
+                <div className="flex items-center space-x-2">
+                  <img 
+                    src={user.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email)}&background=random`}
+                    alt={user.email} 
+                    className="w-8 h-8 rounded-full"
+                  />
+                  <span className="text-sm font-medium">{user.email}</span>
+                  <button 
+                    onClick={handleSignOut}
+                    className="text-sm text-gray-300 hover:text-white flex items-center"
                   >
-                    <LogOut className="w-4 h-4" />
-                    <span className="hidden sm:inline">Sign Out</span>
+                    <LogOut className="w-4 h-4 mr-1" />
+                    Sign Out
                   </button>
-                </>
+                </div>
               ) : (
-                <button
-                  onClick={signInWithGoogle}
-                  className="flex items-center space-x-2 bg-blue-600/90 hover:bg-blue-700 px-4 py-2 rounded-lg text-white font-medium transition-all duration-300 hover:scale-105 font-sans"
+                <button 
+                  onClick={handleSignIn}
+                  className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:opacity-90 transition-opacity"
                 >
-                  <LogIn className="w-4 h-4" />
-                  <span className="hidden sm:inline">Sign In</span>
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Sign In with Google
                 </button>
               )}
             </div>
